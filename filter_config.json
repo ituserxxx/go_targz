@@ -1,0 +1,8 @@
+{
+  "dir": [],
+  "files": ["aaa_xxx.go"],
+  "file_prex": ["kkk_"],
+  "file_suffix":[".gz"],
+  "dir_prex": [],
+  "dir_suffix":[]
+}
