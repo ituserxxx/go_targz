@@ -11,10 +11,6 @@ import (
 	"strings"
 	"time"
 )
-
-/*
-	使用golang写的压缩工具，
-*/
 type DiyFilter struct {
 	Dir        []string `json:"dir"`
 	Files      []string `json:"files"`
@@ -49,7 +45,6 @@ var txt = `
 
 
 `
-
 func main() {
 	parasm := os.Args[1:]
 
@@ -82,17 +77,15 @@ func main() {
 		fmt.Println("无法获取当前目录:", err)
 		return
 	}
-
 	fmt.Println("即将压缩目录为" + dirPath)
 	outputPath := fmt.Sprintf("%s-%d.tar.gz", filepath.Base(dirPath), time.Now().Nanosecond())
-	err = compressTarGz(dirPath, outputPath)
+	err = tarGzDirectory(dirPath, outputPath)
 	if err != nil {
-		fmt.Println("Failed to create tar.gz:", err)
+		fmt.Printf("Error compressing directory: %v\n", err)
 		return
 	}
 	fmt.Println("\n压缩成功，新文件名称------" + outputPath + "-----successfully!")
 }
-
 func isBeFilter(isDir bool, objName string) bool {
 	if filterConfig == nil {
 		return false
@@ -132,360 +125,63 @@ func isBeFilter(isDir bool, objName string) bool {
 	}
 	return false
 }
-func compressTarGz(source, destination string) error {
-	// 创建输出文件
-	file, err := os.Create(destination)
+func tarGzDirectory(source, tarFile string) error {
+	tarFilePtr, err := os.Create(tarFile)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer tarFilePtr.Close()
 
-	// 创建gzip写入器
-	gw := gzip.NewWriter(file)
-	defer gw.Close()
+	gzipWriter := gzip.NewWriter(tarFilePtr)
+	defer gzipWriter.Close()
 
-	// 创建tar写入器
-	tw := tar.NewWriter(gw)
-	defer tw.Close()
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
 
-	// 获取源路径信息
-	info, err := os.Stat(source)
-	if err != nil {
-		return err
-	}
-
-	// 如果是目录，则遍历目录并递归压缩
-	if info.IsDir() {
-		baseDir := filepath.Base(source)
-		return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if info.Name() == destination {
-				return nil
-			}
-
-			if isBeFilter(info.IsDir(), info.Name()) {
-				fmt.Printf("\n已过滤--->> path=%s  info.name=%s", path, info.Name())
-				if info.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			// 获取相对路径
-			relPath, err := filepath.Rel(source, path)
-			if err != nil {
-				return err
-			}
-
-			// 创建tar头部信息
-			header, err := tar.FileInfoHeader(info, relPath)
-			if err != nil {
-				return err
-			}
-
-			// 更新头部信息中的名称为相对路径
-			header.Name = filepath.Join(baseDir, filepath.ToSlash(relPath))
-
-			// 写入头部信息
-			err = tw.WriteHeader(header)
-			if err != nil {
-				return err
-			}
-
-			// 如果不是目录，则写入文件内容
-			if !info.IsDir() {
-				file, err := os.Open(path)
-				if err != nil {
-					return err
-				}
-				defer file.Close()
-
-				// 将文件内容写入tar
-				_, err = io.Copy(tw, file)
-				if err != nil {
-					return err
-				}
-			}
-
+	err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Name() == tarFile {
 			return nil
-		})
-	} else { // 如果是单个文件，则直接压缩
-		file, err := os.Open(source)
+		}
+		if isBeFilter(info.IsDir(), info.Name()) {
+			fmt.Printf("\n已过滤--->> path=%s  info.name=%s", path, info.Name())
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		header, err := tar.FileInfoHeader(info, info.Name())
+		if err != nil {
+			return err
+		}
+
+		// 将Windows风格路径转换为Linux风格路径
+		header.Name = filepath.ToSlash(path[len(source):])
+
+		err = tarWriter.WriteHeader(header)
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
 
-		// 创建tar头部信息
-		header, err := tar.FileInfoHeader(info, "")
+		_, err = io.Copy(tarWriter, file)
 		if err != nil {
 			return err
 		}
 
-		// 写入头部信息
-		err = tw.WriteHeader(header)
-		if err != nil {
-			return err
-		}
-
-		// 将文件内容写入tar
-		_, err = io.Copy(tw, file)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type Config struct {
-	SkipPrefixes []string `json:"skip_prefixes"`
-}
-
-func main2() {
-	// 读取配置文件
-	//configFile, err := os.Open("quickPacking.json")
-	//
-	//if err != nil {
-	//	fmt.Println("无法打开配置文件:", err)
-	//	return
-	//}
-	//defer configFile.Close()
-	//
-	//var config Config
-	//decoder := json.NewDecoder(configFile)
-	//if err := decoder.Decode(&config); err != nil {
-	//	fmt.Println("配置文件解析错误:", err)
-	//	return
-	//}
-	//--------------------
-	// 获取当前目录名称作为压缩包名称
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("无法获取当前目录:", err)
-		return
-	}
-	println(currentDir)
-	//tarFileName := filepath.Base(currentDir) +string()+ ".tar.gz"
-	tarFileName := fmt.Sprintf("%s-%d.tar.gz", filepath.Base(currentDir), time.Now().Nanosecond())
-
-	// 创建目标 tar 文件
-	tarFile, err := os.Create(tarFileName)
-	if err != nil {
-		fmt.Println("无法创建 tar 文件:", err)
-		return
-	}
-	defer tarFile.Close()
-	println(tarFileName)
-	//--------------------
-
-	// 使用 gzip 创建压缩写入器
-	gzipWriter := gzip.NewWriter(tarFile)
-	defer gzipWriter.Close()
-
-	// 创建 tar 写入器
-	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
-
-	// 遍历当前目录及其子目录，压缩文件和文件夹
-	filepath.Walk(currentDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			fmt.Println("遍历目录时出错:", err)
-			return err
-		}
-
-		//// 跳过 .DS_Store 文件
-		//if filepath.Base(path) == ".DS_Store" {
-		//	return nil
-		//}
-		//
-		//if info.IsDir() {
-		//	// 检查是否需要跳过压缩
-		//	shouldSkip := false
-		//	for _, prefix := range config.SkipPrefixes {
-		//		if strings.HasPrefix(filepath.Base(path), prefix) {
-		//			shouldSkip = true
-		//			break
-		//		}
-		//	}
-		//	if shouldSkip {
-		//		return nil // SkipDir改为返回nil
-		//	}
-		//}
-
-		// 获取相对路径
-		relPath, err := filepath.Rel(currentDir, path)
-		if err != nil {
-			fmt.Println("获取相对路径时出错:", err)
-			return err
-		}
-
-		// 创建 tar 条目头部
-		header := new(tar.Header)
-		header.Name = relPath
-		header.Mode = int64(info.Mode())
-		header.Size = info.Size()
-		header.ModTime = info.ModTime()
-
-		fmt.Printf("Writing header for %s\n", relPath)
-
-		// 写入 tar 条目头部
-		if err := tarWriter.WriteHeader(header); err != nil {
-			fmt.Println("写入 tar 条目头部时出错:", err)
-			return err
-		}
-
-		// 如果不是目录，写入文件内容
-		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				fmt.Println("无法打开文件:", err)
-				return err
-			}
-			defer file.Close()
-
-			fmt.Printf("Writing content for %s\n", relPath)
-
-			_, err = io.Copy(tarWriter, file)
-			if err != nil {
-				fmt.Println("复制文件内容时出错:", err)
-				return err
-			}
-		}
 		return nil
 	})
 
-}
-func gentorTargzFile() {
-	// 获取当前目录名称作为压缩包名称
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("无法获取当前目录:", err)
-		return
-	}
-	println(currentDir)
-	//tarFileName := filepath.Base(currentDir) +string()+ ".tar.gz"
-	tarFileName := fmt.Sprintf("%s-%d.tar.gz", filepath.Base(currentDir), time.Now().Nanosecond())
-
-	// 创建目标 tar 文件
-	tarFile, err := os.Create(tarFileName)
-	if err != nil {
-		fmt.Println("无法创建 tar 文件:", err)
-		return
-	}
-	defer tarFile.Close()
-	println(tarFileName)
-
-}
-func aaa() {
-	// 读取配置文件
-	configFile, err := os.Open("quickPacking.json")
-
-	if err != nil {
-		fmt.Println("无法打开配置文件:", err)
-		return
-	}
-	defer configFile.Close()
-
-	var config Config
-	decoder := json.NewDecoder(configFile)
-	if err := decoder.Decode(&config); err != nil {
-		fmt.Println("配置文件解析错误:", err)
-		return
-	}
-
-	// 获取当前目录名称作为压缩包名称
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("无法获取当前目录:", err)
-		return
-	}
-	tarFileName := filepath.Base(currentDir) + ".tar.gz"
-
-	// 创建目标 tar 文件
-	tarFile, err := os.Create(tarFileName)
-	if err != nil {
-		fmt.Println("无法创建 tar 文件:", err)
-		return
-	}
-	defer tarFile.Close()
-
-	// 使用 gzip 创建压缩写入器
-	gzipWriter := gzip.NewWriter(tarFile)
-	defer gzipWriter.Close()
-
-	// 创建 tar 写入器
-	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
-
-	// 遍历当前目录及其子目录，压缩文件和文件夹
-	filepath.Walk(currentDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			fmt.Println("遍历目录时出错:", err)
-			return err
-		}
-
-		// 跳过 .DS_Store 文件
-		if filepath.Base(path) == ".DS_Store" {
-			return nil
-		}
-
-		if info.IsDir() {
-			// 检查是否需要跳过压缩
-			shouldSkip := false
-			for _, prefix := range config.SkipPrefixes {
-				if strings.HasPrefix(filepath.Base(path), prefix) {
-					shouldSkip = true
-					break
-				}
-			}
-			if shouldSkip {
-				return nil // SkipDir改为返回nil
-			}
-		}
-
-		// 获取相对路径
-		relPath, err := filepath.Rel(currentDir, path)
-		if err != nil {
-			fmt.Println("获取相对路径时出错:", err)
-			return err
-		}
-
-		// 创建 tar 条目头部
-		header := new(tar.Header)
-		header.Name = relPath
-		header.Mode = int64(info.Mode())
-		header.Size = info.Size()
-		header.ModTime = info.ModTime()
-
-		fmt.Printf("Writing header for %s\n", relPath)
-
-		// 写入 tar 条目头部
-		if err := tarWriter.WriteHeader(header); err != nil {
-			fmt.Println("写入 tar 条目头部时出错:", err)
-			return err
-		}
-
-		// 如果不是目录，写入文件内容
-		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				fmt.Println("无法打开文件:", err)
-				return err
-			}
-			defer file.Close()
-
-			fmt.Printf("Writing content for %s\n", relPath)
-
-			_, err = io.Copy(tarWriter, file)
-			if err != nil {
-				fmt.Println("复制文件内容时出错:", err)
-				return err
-			}
-		}
-		return nil
-	})
-
-	fmt.Println("压缩完成:", tarFileName)
+	return err
 }

@@ -1,5 +1,5 @@
 {
-  "dir": ["kkkk"],
+  "dir": ["project_tool"],
   "files": ["a1.go"],
   "file_prex": ["aaa_"],
   "file_suffix":[".gz"],
