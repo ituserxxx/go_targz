@@ -1,7 +1,7 @@
 {
-  "dir": [],
-  "files": ["aaa_xxx.go"],
-  "file_prex": ["kkk_"],
+  "dir": ["kkkk"],
+  "files": ["a1.go"],
+  "file_prex": ["aaa_"],
   "file_suffix":[".gz"],
   "dir_prex": [],
   "dir_suffix":[]

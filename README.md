@@ -36,9 +36,24 @@
 
 
 #### 按需下载
+
+```
+go build -o go_targz_win.exe main.go
+```
 windows 使用 go_targz_win.exe
 
+```
+set GOOS=darwin
+set GOARCH=amd64
+go build -o go_targz_mac main.go
+```
 mac 使用 go_targz_mac
 
+
+```
+set GOARCH=amd64
+set GOOS=linux
+go build -o go_targz_linux main.go
+```
 linux 使用 go_targz_linux
 

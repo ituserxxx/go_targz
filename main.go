@@ -167,6 +167,9 @@ func compressTarGz(source, destination string) error {
 
 			if isBeFilter(info.IsDir(), info.Name()) {
 				fmt.Printf("\n已过滤--->> path=%s  info.name=%s", path, info.Name())
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
 				return nil
 			}
 			// 获取相对路径
